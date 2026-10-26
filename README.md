@@ -181,7 +181,8 @@ markers, a driving route, route distance, and estimated driving time. Common Ind
 bundled coordinates; other locations are resolved with Photon. Routes are requested from the
 public OSRM demo service. Map tiles and geocoding/routing services require an internet connection.
 
-The truck marker is a demo estimate that moves when the booking stage changes; this project does
-not yet receive GPS updates from a driver or carrier. Before production use, configure appropriately
-licensed, capacity-planned geocoding/routing/tile services and connect an authenticated driver or
-carrier location feed. Do not treat the demo marker or ETA as a live vehicle position.
+In demo mode, the truck marker automatically animates along the route over 90 seconds and can be
+paused or replayed. This is simulated presentation data: the project does not yet receive GPS
+updates from a driver or carrier. Before production use, configure appropriately licensed,
+capacity-planned geocoding/routing/tile services and connect an authenticated driver or carrier
+location feed. Do not treat the demo marker or ETA as a live vehicle position.

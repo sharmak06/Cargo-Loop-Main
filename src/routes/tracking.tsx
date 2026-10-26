@@ -31,7 +31,7 @@ export const Route = createFileRoute("/tracking")({
 });
 
 function BookingCard({ booking }: { booking: Booking }) {
-  const { advanceBooking, uploadPod, releasePayment } = useSession();
+  const { advanceBooking, uploadPod, releasePayment, demo } = useSession();
   const delivered = booking.stageIndex === 3;
 
   return (
@@ -69,7 +69,7 @@ function BookingCard({ booking }: { booking: Booking }) {
           ))}
         </div>
 
-        <ShipmentMap booking={booking} />
+        <ShipmentMap booking={booking} demoMode={demo} />
 
         <div className="grid gap-3 sm:grid-cols-3">
           {[

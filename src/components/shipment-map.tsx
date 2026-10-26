@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as LeafletMap, Marker, Polyline } from "leaflet";
-import { MapPin, Navigation, RefreshCw, Truck } from "lucide-react";
+import { MapPin, Navigation, Pause, Play, RefreshCw, RotateCcw, Truck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { Booking } from "@/lib/session";
@@ -154,7 +154,7 @@ function formatDuration(durationSeconds: number): string {
   return wholeDays ? `${wholeDays} d ${remainingHours} hr` : `${hours} hr`;
 }
 
-export function ShipmentMap({ booking }: { booking: Booking }) {
+export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode: boolean }) {
   const mapElement = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
   const truckMarker = useRef<Marker | null>(null);
@@ -163,6 +163,9 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
   const [error, setError] = useState<string | null>(null);
   const [retry, setRetry] = useState(0);
   const [mapReady, setMapReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [progress, setProgress] = useState(() => [0, 0.16, 0.62, 1][booking.stageIndex] ?? 0);
+  const [truckPosition, setTruckPosition] = useState<Coordinates | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -172,6 +175,7 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
     setError(null);
     setRoute(null);
     setMapReady(false);
+    setTruckPosition(null);
     map.current = null;
     truckMarker.current = null;
     routeLine.current = null;
@@ -221,7 +225,10 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
         });
         truckMarker.current = L.marker(pickup, { icon: truckIcon, zIndexOffset: 1000 })
           .addTo(leafletMap)
-          .bindTooltip("Estimated demo position", { direction: "top", offset: [0, -18] });
+          .bindTooltip(
+            demoMode ? "Simulated demo position" : "Estimated route position · not GPS",
+            { direction: "top", offset: [0, -18] },
+          );
         leafletMap.fitBounds(routeLine.current.getBounds(), { padding: [42, 42] });
         setRoute(roadRoute);
         setMapReady(true);
@@ -242,15 +249,51 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
       truckMarker.current = null;
       routeLine.current = null;
     };
-  }, [booking.shipment.delivery, booking.shipment.pickup, retry]);
+  }, [booking.shipment.delivery, booking.shipment.pickup, demoMode, retry]);
+
+  useEffect(() => {
+    if (booking.stageIndex === 3) {
+      setIsPlaying(false);
+      setProgress(1);
+      return;
+    }
+    if (demoMode && route) setIsPlaying(true);
+  }, [booking.stageIndex, demoMode, route]);
+
+  useEffect(() => {
+    if (!route || !mapReady) return;
+    const startingProgress = [0, 0.16, 0.62, 1][booking.stageIndex] ?? 0;
+    if (!demoMode || !isPlaying) setProgress(startingProgress);
+  }, [booking.stageIndex, demoMode, isPlaying, mapReady, route]);
 
   useEffect(() => {
     if (!route || !truckMarker.current || !map.current) return;
-    const progressByStage = [0, 0.16, 0.62, 1];
-    const progress = progressByStage[booking.stageIndex] ?? 0;
-    truckMarker.current.setLatLng(routePosition(route, progress));
-    routeLine.current?.setStyle({ opacity: booking.stageIndex === 0 ? 0.55 : 0.9 });
-  }, [booking.stageIndex, route]);
+    const position = routePosition(route, progress);
+    truckMarker.current.setLatLng(position);
+    routeLine.current?.setStyle({ opacity: progress === 0 ? 0.55 : 0.9 });
+    setTruckPosition(position);
+  }, [progress, route]);
+
+  useEffect(() => {
+    if (!demoMode || !isPlaying || !route) return;
+    const interval = window.setInterval(() => {
+      setProgress((current) => Math.min(current + 1 / 90, 1));
+    }, 1000);
+
+    return () => window.clearInterval(interval);
+  }, [demoMode, isPlaying, route]);
+
+  useEffect(() => {
+    if (progress >= 1) setIsPlaying(false);
+  }, [progress]);
+
+  function startDemoTrip() {
+    if (progress >= 1) setProgress(0);
+    setIsPlaying(true);
+  }
+
+  const remainingDistance = route ? route.distanceMeters * (1 - progress) : null;
+  const remainingMinutes = route ? Math.ceil((route.durationSeconds * (1 - progress)) / 60) : null;
 
   return (
     <section
@@ -268,9 +311,40 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
             </p>
           ) : null}
         </div>
-        <Badge variant="outline" className="gap-1.5">
-          <Truck className="size-3.5" /> Demo position · GPS not connected
-        </Badge>
+        {demoMode ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {isPlaying ? (
+              <Badge className="gap-1.5 bg-success text-success-foreground">
+                <span className="size-2 animate-pulse rounded-full bg-current" />
+                SIMULATED LIVE
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1.5">
+                {progress >= 1 ? "DEMO COMPLETE" : "SIMULATION PAUSED"}
+              </Badge>
+            )}
+            {mapReady && booking.stageIndex < 3 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={isPlaying ? () => setIsPlaying(false) : startDemoTrip}
+              >
+                {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+                {isPlaying ? "Pause demo" : "Play demo"}
+              </Button>
+            ) : null}
+            {mapReady && booking.stageIndex === 3 ? (
+              <Button type="button" variant="outline" size="sm" onClick={startDemoTrip}>
+                <RotateCcw className="size-4" /> Replay demo
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <Badge variant="outline" className="gap-1.5">
+            <Truck className="size-3.5" /> DRIVER GPS FEED REQUIRED
+          </Badge>
+        )}
       </div>
 
       <div className="relative h-[320px] overflow-hidden rounded-xl border border-border bg-secondary/60 sm:h-[400px]">
@@ -290,9 +364,24 @@ export function ShipmentMap({ booking }: { booking: Booking }) {
           </div>
         ) : null}
       </div>
+      {demoMode &&
+      mapReady &&
+      truckPosition &&
+      remainingDistance !== null &&
+      remainingMinutes !== null ? (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-xs">
+          <span className="font-medium">
+            Demo truck position: {truckPosition[0].toFixed(4)}, {truckPosition[1].toFixed(4)}
+          </span>
+          <span className="text-muted-foreground">
+            {formatDistance(remainingDistance)} remaining · ~{remainingMinutes} min
+          </span>
+        </div>
+      ) : null}
       <p className="mt-2 text-xs text-muted-foreground">
-        The truck marker advances with the booking status as a demo estimate. Connect a driver GPS
-        or carrier feed to show real-time location.
+        {demoMode
+          ? "Demo mode animates the truck along the route for presentation. This is simulated data, not a live vehicle location. Real tracking requires a driver GPS or carrier feed."
+          : "Live vehicle position is unavailable until the driver app or carrier GPS feed is connected."}
       </p>
     </section>
   );
