@@ -226,7 +226,7 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
         truckMarker.current = L.marker(pickup, { icon: truckIcon, zIndexOffset: 1000 })
           .addTo(leafletMap)
           .bindTooltip(
-            demoMode ? "Simulated demo position" : "Estimated route position · not GPS",
+            demoMode ? "Simulated truck position" : "Estimated route position · not GPS",
             { direction: "top", offset: [0, -18] },
           );
         leafletMap.fitBounds(routeLine.current.getBounds(), { padding: [42, 42] });
@@ -287,7 +287,7 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
     if (progress >= 1) setIsPlaying(false);
   }, [progress]);
 
-  function startDemoTrip() {
+  function startRouteSimulation() {
     if (progress >= 1) setProgress(0);
     setIsPlaying(true);
   }
@@ -316,11 +316,11 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
             {isPlaying ? (
               <Badge className="gap-1.5 bg-success text-success-foreground">
                 <span className="size-2 animate-pulse rounded-full bg-current" />
-                SIMULATED LIVE
+                LIVE · SIMULATED
               </Badge>
             ) : (
               <Badge variant="outline" className="gap-1.5">
-                {progress >= 1 ? "DEMO COMPLETE" : "SIMULATION PAUSED"}
+                {progress >= 1 ? "ROUTE COMPLETE" : "SIMULATION PAUSED"}
               </Badge>
             )}
             {mapReady && booking.stageIndex < 3 ? (
@@ -328,15 +328,15 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={isPlaying ? () => setIsPlaying(false) : startDemoTrip}
+                onClick={isPlaying ? () => setIsPlaying(false) : startRouteSimulation}
               >
                 {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-                {isPlaying ? "Pause demo" : "Play demo"}
+                {isPlaying ? "Pause" : "Resume"}
               </Button>
             ) : null}
             {mapReady && booking.stageIndex === 3 ? (
-              <Button type="button" variant="outline" size="sm" onClick={startDemoTrip}>
-                <RotateCcw className="size-4" /> Replay demo
+              <Button type="button" variant="outline" size="sm" onClick={startRouteSimulation}>
+                <RotateCcw className="size-4" /> Replay route
               </Button>
             ) : null}
           </div>
@@ -371,7 +371,7 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
       remainingMinutes !== null ? (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg bg-secondary/60 px-3 py-2 text-xs">
           <span className="font-medium">
-            Demo truck position: {truckPosition[0].toFixed(4)}, {truckPosition[1].toFixed(4)}
+            Current simulated position: {truckPosition[0].toFixed(4)}, {truckPosition[1].toFixed(4)}
           </span>
           <span className="text-muted-foreground">
             {formatDistance(remainingDistance)} remaining · ~{remainingMinutes} min
@@ -380,7 +380,7 @@ export function ShipmentMap({ booking, demoMode }: { booking: Booking; demoMode:
       ) : null}
       <p className="mt-2 text-xs text-muted-foreground">
         {demoMode
-          ? "Demo mode animates the truck along the route for presentation. This is simulated data, not a live vehicle location. Real tracking requires a driver GPS or carrier feed."
+          ? "The marker moves in a live route simulation, not from vehicle GPS. Connect a driver GPS or carrier feed for real live tracking."
           : "Live vehicle position is unavailable until the driver app or carrier GPS feed is connected."}
       </p>
     </section>
